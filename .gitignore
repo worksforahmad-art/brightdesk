@@ -1,0 +1,16 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Environment Variables (never commit real secrets) ─────────────────────────
+.env
+
+# ── Database files (contain real user data — keep out of Git) ─────────────────
+backend/database/*.db
+backend/database/*.db-shm
+backend/database/*.db-wal
+
+# ── OS & Editor files ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.log

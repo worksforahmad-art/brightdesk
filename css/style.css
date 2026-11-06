@@ -1,0 +1,175 @@
+/*
+ * style.css — Global Base Styles
+ *
+ * This file is loaded by EVERY page.
+ * It defines:
+ *   - CSS custom properties (variables) for the colour palette and spacing
+ *   - A clean CSS reset so browsers render elements consistently
+ *   - Shared utility classes used across auth and dashboard pages
+ */
+
+/* ── Google Font is loaded via <link> in each HTML file ─────────────────── */
+
+/* ── Design Tokens (CSS Variables) ──────────────────────────────────────── */
+:root {
+    /* Colours */
+    --clr-primary:          #1a73e8;
+    --clr-primary-dark:     #1557b0;
+    --clr-secondary:        #9333ea;
+    --clr-secondary-dark:   #7e22ce;
+    --clr-gradient:         linear-gradient(135deg, #1a73e8 0%, #9333ea 100%);
+    --clr-gradient-hover:   linear-gradient(135deg, #1557b0 0%, #7e22ce 100%);
+
+    --clr-bg:               #edf2f7;
+    --clr-surface:          #ffffff;
+    --clr-surface-glass:    rgba(255, 255, 255, 0.88);
+    --clr-border:           #e2e8f0;
+    --clr-border-hover:     #cbd5e1;
+
+    --clr-text:             #1e293b;
+    --clr-text-muted:       #64748b;
+    --clr-text-light:       #94a3b8;
+
+    --clr-success:          #10b981;
+    --clr-success-bg:       #ecfdf5;
+    --clr-success-border:   #a7f3d0;
+    --clr-error:            #ef4444;
+    --clr-error-bg:         #fef2f2;
+    --clr-error-border:     #fecaca;
+
+    /* Spacing & Shape */
+    --radius-sm:    8px;
+    --radius-md:    14px;
+    --radius-lg:    20px;
+    --radius-xl:    24px;
+
+    /* Shadows */
+    --shadow-card:  0 20px 40px -8px rgba(26, 115, 232, 0.12), 0 8px 20px -4px rgba(0, 0, 0, 0.06);
+    --shadow-focus: 0 0 0 3px rgba(26, 115, 232, 0.2);
+
+    /* Transition */
+    --ease: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Font */
+    --font: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin:     0;
+    padding:    0;
+}
+
+html {
+    font-size:  16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family:      var(--font);
+    background-color: var(--clr-bg);
+    color:            var(--clr-text);
+    min-height:       100vh;
+    line-height:      1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ── Shared Utility Classes ──────────────────────────────────────────────── */
+
+/* Primary gradient button (used on both auth pages) */
+.btn-primary {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             8px;
+    width:           100%;
+    padding:         14px 20px;
+    font-size:       1rem;
+    font-weight:     600;
+    color:           #fff;
+    background:      var(--clr-gradient);
+    border:          none;
+    border-radius:   var(--radius-md);
+    cursor:          pointer;
+    transition:      var(--ease);
+    box-shadow:      0 6px 20px rgba(26, 115, 232, 0.3);
+    margin-top:      8px;
+}
+
+.btn-primary:hover {
+    background:  var(--clr-gradient-hover);
+    transform:   translateY(-2px);
+    box-shadow:  0 10px 24px rgba(26, 115, 232, 0.4);
+}
+
+.btn-primary:active {
+    transform:  translateY(0);
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+}
+
+.btn-primary:disabled {
+    opacity:        0.7;
+    cursor:         not-allowed;
+    transform:      none;
+    pointer-events: none;
+}
+
+/* Spinner icon (rotating loader inside buttons) */
+.spinner-icon {
+    width:     18px;
+    height:    18px;
+    animation: spin 0.7s linear infinite;
+}
+
+.spinner-icon.large {
+    width:  40px;
+    height: 40px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Brand — logo mark used in sidebar and auth cards */
+.brand-icon {
+    font-size:   1.3rem;
+    line-height: 1;
+}
+
+.brand-name {
+    font-size:   1.1rem;
+    font-weight: 700;
+    color:       var(--clr-text);
+    letter-spacing: -0.02em;
+}
+
+/* Text link */
+.link {
+    color:       var(--clr-primary);
+    font-weight: 600;
+    transition:  var(--ease);
+}
+
+.link:hover {
+    color:           var(--clr-primary-dark);
+    text-decoration: underline;
+}
