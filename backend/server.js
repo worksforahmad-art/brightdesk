@@ -24,6 +24,16 @@ const createSessionStore = require('./middleware/sessionStore');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Trust Railway / reverse proxy headers (X-Forwarded-Proto, X-Forwarded-For)
+// Essential for secure cookies over HTTPS and correct client IP rate limiting
+app.set('trust proxy', 1);
+
+if (isProduction && !process.env.SESSION_SECRET) {
+    console.warn('⚠️  WARNING: SESSION_SECRET is not set in environment variables! Please configure it in Railway.');
+}
 
 // ── 1. Security Headers (helmet) ──────────────────────────────────────────────
 // helmet sets sensible HTTP headers to protect against common attacks
@@ -60,10 +70,11 @@ app.use(
         secret:            process.env.SESSION_SECRET || 'dev-fallback-secret-change-me',
         resave:            false,
         saveUninitialized: false,
+        proxy:             true, // respect reverse-proxy HTTPS status for cookies
         cookie: {
             httpOnly: true,  // JavaScript cannot read this cookie — prevents XSS theft
-            secure:   process.env.NODE_ENV === 'production', // HTTPS-only in production
-            sameSite: 'strict', // blocks cross-site requests — basic CSRF protection
+            secure:   isProduction, // HTTPS-only in production (uses X-Forwarded-Proto via proxy)
+            sameSite: 'lax', // allows smooth redirection back into the app while protecting against CSRF
             maxAge:   24 * 60 * 60 * 1000 // 24 hours in milliseconds
         }
     })
@@ -139,10 +150,10 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 // ── 10. Start Server ──────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
     console.log('');
     console.log('  ✨  BrightDesk is running!');
-    console.log(`  🌐  Open: http://localhost:${PORT}`);
+    console.log(`  🌐  Listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
     console.log('  ⏹   Press Ctrl + C to stop.');
     console.log('');
 });
