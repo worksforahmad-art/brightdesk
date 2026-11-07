@@ -228,23 +228,27 @@
 
 /* Add right padding so text doesn't go under the toggle icon */
 .input-with-toggle .field-input {
-    padding-right: 46px;
+    padding-right: 50px;
 }
 
 .toggle-password {
     position:         absolute;
-    right:            12px;
+    right:            6px;
     top:              50%;
     transform:        translateY(-50%);
     background:       transparent;
     border:           none;
-    padding:          6px;
+    width:            44px;
+    height:           44px;
     border-radius:    var(--radius-sm);
     color:            var(--clr-text-muted);
     display:          flex;
     align-items:      center;
     justify-content:  center;
+    cursor:           pointer;
     transition:       var(--ease);
+    padding:          0;
+    z-index:          2;
 }
 
 .toggle-password:hover {
@@ -252,9 +256,20 @@
     background-color: rgba(26, 115, 232, 0.08);
 }
 
+.toggle-password:focus-visible {
+    outline:          2px solid var(--clr-primary);
+    outline-offset:   2px;
+}
+
 .toggle-password svg {
-    width:  20px;
-    height: 20px;
+    width:          20px;
+    height:         20px;
+    pointer-events: none;
+    flex-shrink:    0;
+}
+
+.toggle-password svg[hidden] {
+    display: none !important;
 }
 
 /* ── Footer link ──────────────────────────────────────────────────────────── */
@@ -267,12 +282,40 @@
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
+    .auth-page {
+        padding: 16px 12px;
+    }
+
     .auth-card {
-        padding:       28px 20px;
+        padding:       28px 18px;
         border-radius: var(--radius-lg);
+        max-width:     100%;
     }
 
     .auth-header h1 {
-        font-size: 1.5rem;
+        font-size:   1.45rem;
+        line-height: 1.25;
+    }
+
+    .auth-header p {
+        font-size: 0.875rem;
+    }
+
+    .field-label {
+        font-size: 0.85rem;
+    }
+
+    .field-input {
+        font-size: 1rem; /* 16px prevents iOS auto-zoom */
+        padding:   12px 14px;
+    }
+
+    .input-with-toggle .field-input {
+        padding-right: 50px;
+    }
+
+    .field-hint,
+    .field-error {
+        font-size: 0.775rem;
     }
 }

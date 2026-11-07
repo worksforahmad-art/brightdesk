@@ -47,6 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (fullName.length < 2) {
             setFieldError('fullName', 'Full name must be at least 2 characters.');
             hasError = true;
+        } else if (fullName.length > 60) {
+            setFieldError('fullName', 'Full name must be under 60 characters.');
+            hasError = true;
+        } else if (!/\p{L}/u.test(fullName)) {
+            setFieldError('fullName', 'Full name must contain letters.');
+            hasError = true;
+        } else if (!/^[\p{L}\s'\-.]+$/u.test(fullName)) {
+            setFieldError('fullName', 'Full name can only contain letters, spaces, hyphens, and apostrophes.');
+            hasError = true;
         }
 
         if (!username) {

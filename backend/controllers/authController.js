@@ -187,11 +187,16 @@ const authController = {
      * Protected by requireAuthApi — only works if the session is valid.
      */
     getMe(req, res) {
-        const user = userModel.findById(req.session.userId);
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ error: 'Not authenticated. Please log in.' });
+        }
+
+        const user = userModel.findById(Number(req.session.userId));
 
         if (!user) {
             // Session references a user that no longer exists
             req.session.destroy(() => {});
+            res.clearCookie('brightdesk.sid');
             return res.status(401).json({ error: 'Session invalid. Please log in again.' });
         }
 
@@ -201,7 +206,8 @@ const authController = {
                 fullName: user.full_name,
                 username: user.username,
                 email: user.email,
-                createdAt: user.created_at
+                createdAt: user.created_at,
+                status: 'Active'
             }
         });
     }

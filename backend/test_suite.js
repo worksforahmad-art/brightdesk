@@ -146,18 +146,26 @@ async function runTests() {
         // Test 15: Loading of HTML, CSS, JS
         const rLogin = await request(server, { path: '/login' });
         assert(rLogin.status === 200 && rLogin.body.includes('Log In — BrightDesk'), 'Test 15a: GET /login loads HTML');
+        assert(rLogin.body.includes('icon-eye-closed') && rLogin.body.includes('icon-eye-open'), 'Test 15a-2: Login has independent icon-eye-closed and icon-eye-open SVGs');
 
         const rSignup = await request(server, { path: '/signup' });
         assert(rSignup.status === 200 && rSignup.body.includes('Sign Up — BrightDesk'), 'Test 15b: GET /signup loads HTML');
+        assert(rSignup.body.includes('data-target="password"') && rSignup.body.includes('data-target="confirmPassword"'), 'Test 15b-2: Signup has independent password and confirmPassword toggles');
+
+        const rDash = await request(server, { path: '/dashboard' });
+        // unauth redirects, but let's check dashboard.html directly
+        const dashHtml = fs.readFileSync(path.join(__dirname, '../frontend/dashboard.html'), 'utf8');
+        assert(dashHtml.includes('id="dashboard-error-state"') && dashHtml.includes('id="retry-dashboard-btn"'), 'Test 15e-2: Dashboard HTML contains error state card and Retry button');
+        assert(dashHtml.includes('id="home-status"') && dashHtml.includes('id="profile-status"'), 'Test 15e-3: Dashboard HTML contains Account Status displays');
 
         const rCss = await request(server, { path: '/css/style.css' });
-        assert(rCss.status === 200 && rCss.body.includes('--clr-primary'), 'Test 15c: GET /css/style.css loads');
+        assert(rCss.status === 200 && rCss.body.includes('--clr-primary') && rCss.body.includes('[hidden]'), 'Test 15c: GET /css/style.css loads with [hidden] fix');
 
         const rAuthCss = await request(server, { path: '/css/auth.css' });
         assert(rAuthCss.status === 200 && rAuthCss.body.includes('.auth-card'), 'Test 15d: GET /css/auth.css loads');
 
         const rDashCss = await request(server, { path: '/css/dashboard.css' });
-        assert(rDashCss.status === 200 && rDashCss.body.includes('.dashboard-layout'), 'Test 15e: GET /css/dashboard.css loads');
+        assert(rDashCss.status === 200 && rDashCss.body.includes('.dashboard-layout') && rDashCss.body.includes('.status-badge'), 'Test 15e: GET /css/dashboard.css loads with status badge');
 
         const rMainJs = await request(server, { path: '/js/main.js' });
         assert(rMainJs.status === 200 && rMainJs.body.includes('showAlert'), 'Test 15f: GET /js/main.js loads');
@@ -169,7 +177,7 @@ async function runTests() {
         assert(rLoginJs.status === 200 && rLoginJs.body.includes('login-form'), 'Test 15h: GET /js/login.js loads');
 
         const rDashJs = await request(server, { path: '/js/dashboard.js' });
-        assert(rDashJs.status === 200 && rDashJs.body.includes('/api/auth/me'), 'Test 15i: GET /js/dashboard.js loads');
+        assert(rDashJs.status === 200 && rDashJs.body.includes('/api/auth/me') && rDashJs.body.includes('retryBtn'), 'Test 15i: GET /js/dashboard.js loads with retry handler');
 
         // Test 10: Direct unauthenticated access to /dashboard
         const rUnauthDash = await request(server, { path: '/dashboard' });
@@ -178,6 +186,26 @@ async function runTests() {
         // Test 2: Registration with empty fields
         const rEmptyReg = await request(server, { path: '/api/auth/signup', method: 'POST' }, {});
         assert(rEmptyReg.status === 400 && rEmptyReg.body.errors && rEmptyReg.body.errors.length > 0, 'Test 2: Registration with empty fields returns 400 validation error');
+
+        // Test Full Name Validation: Numeric-only name reject
+        const rNumericName = await request(server, { path: '/api/auth/signup', method: 'POST' }, {
+            fullName: '2573486',
+            username: 'numericuser',
+            email: 'numeric@example.com',
+            password: 'Password123',
+            confirmPassword: 'Password123'
+        });
+        assert(rNumericName.status === 400 && rNumericName.body.errors.some(e => e.message.includes('Full name must contain letters')), 'Test Full Name: Numeric-only name 2573486 is rejected with 400');
+
+        // Test Full Name Validation: Invalid symbols reject
+        const rSymbolName = await request(server, { path: '/api/auth/signup', method: 'POST' }, {
+            fullName: 'User#123$',
+            username: 'symboluser',
+            email: 'symbol@example.com',
+            password: 'Password123',
+            confirmPassword: 'Password123'
+        });
+        assert(rSymbolName.status === 400, 'Test Full Name: Invalid symbols rejected with 400');
 
         // Test 3: Registration with mismatched passwords
         const rMismatch = await request(server, { path: '/api/auth/signup', method: 'POST' }, {
@@ -253,6 +281,7 @@ async function runTests() {
             headers: { Cookie: sessionCookie }
         });
         assert(rMe.status === 200 && rMe.body.user.email === 'testuser@example.com' && rMe.body.user.fullName === 'Test User', 'Test 11b: /api/auth/me returns authenticated user details');
+        assert(rMe.body.user.status === 'Active', 'Test 11c: /api/auth/me returns Account status: Active');
 
         // Test 12: Logout functionality
         const rLogout = await request(server, {

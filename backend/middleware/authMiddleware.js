@@ -35,6 +35,7 @@ function requireAuth(req, res, next) {
  * Returns a JSON error instead of an HTML redirect.
  */
 function requireAuthApi(req, res, next) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     if (req.session && req.session.userId) {
         return next();
     }

@@ -80,6 +80,26 @@
                     <p>Loading your dashboard…</p>
                 </div>
 
+                <!-- Error state — shown if loading fails or times out -->
+                <div class="dashboard-error-state" id="dashboard-error-state" hidden role="alert" aria-live="polite">
+                    <div class="error-card">
+                        <div class="error-card__icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                        </div>
+                        <h2 class="error-card__title">Unable to Load Dashboard</h2>
+                        <p class="error-card__text" id="dashboard-error-message">Something went wrong while retrieving your account information.</p>
+                        <div class="error-card__actions">
+                            <button type="button" class="btn-primary error-retry-btn" id="retry-dashboard-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                                <span>Try Again</span>
+                            </button>
+                            <button type="button" class="btn-secondary error-logout-btn" id="error-logout-btn">
+                                <span>Sign Out</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ── HOME SECTION ──────────────────────────────── -->
                 <section class="content-section" id="section-home" hidden>
 
@@ -122,6 +142,16 @@
                             <div class="info-card__body">
                                 <span class="info-card__label">Member Since</span>
                                 <span class="info-card__value" id="home-joined">—</span>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-card__icon info-card__icon--status">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div class="info-card__body">
+                                <span class="info-card__label">Account Status</span>
+                                <span class="info-card__value"><span class="status-badge status-badge--active" id="home-status">Active</span></span>
                             </div>
                         </div>
                     </div>
@@ -171,6 +201,11 @@
                             <div class="detail-row">
                                 <span class="detail-label">Member Since</span>
                                 <span class="detail-value" id="profile-joined-detail">—</span>
+                            </div>
+
+                            <div class="detail-row">
+                                <span class="detail-label">Account Status</span>
+                                <span class="detail-value"><span class="status-badge status-badge--active" id="profile-status">Active</span></span>
                             </div>
 
                         </div>

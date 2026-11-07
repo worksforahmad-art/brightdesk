@@ -147,17 +147,25 @@ function initPasswordToggles() {
             const input    = document.getElementById(targetId);
             if (!input) return;
 
-            const isPassword = input.type === 'password';
-            input.type = isPassword ? 'text' : 'password';
+            const isCurrentlyPassword = input.type === 'password';
+            // Toggle input type
+            input.type = isCurrentlyPassword ? 'text' : 'password';
 
-            // Swap the eye icons
-            const showIcon = btn.querySelector('.icon-eye-show');
-            const hideIcon = btn.querySelector('.icon-eye-hide');
-            if (showIcon) showIcon.hidden = isPassword;
-            if (hideIcon) hideIcon.hidden = !isPassword;
+            const closedIcon = btn.querySelector('.icon-eye-closed');
+            const openIcon   = btn.querySelector('.icon-eye-open');
+            const fieldLabel = targetId === 'confirmPassword' ? 'confirm password' : 'password';
 
-            // Update the accessible label
-            btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+            if (isCurrentlyPassword) {
+                // Password is now VISIBLE -> show regular eye, hide crossed-out eye
+                if (closedIcon) closedIcon.hidden = true;
+                if (openIcon)   openIcon.hidden   = false;
+                btn.setAttribute('aria-label', `Hide ${fieldLabel}`);
+            } else {
+                // Password is now HIDDEN -> show crossed-out eye, hide regular eye
+                if (closedIcon) closedIcon.hidden = false;
+                if (openIcon)   openIcon.hidden   = true;
+                btn.setAttribute('aria-label', `Show ${fieldLabel}`);
+            }
         });
     });
 }

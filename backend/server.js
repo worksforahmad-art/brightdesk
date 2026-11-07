@@ -13,7 +13,6 @@ require('dotenv').config();
 const express    = require('express');
 const session    = require('express-session');
 const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
 const path       = require('path');
 
 // Our own modules
@@ -80,27 +79,14 @@ app.use(
     })
 );
 
-// ── 4. Rate Limiting ──────────────────────────────────────────────────────────
-// Limits how many login/signup attempts can come from one IP address.
-// Helps prevent brute-force password attacks.
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15-minute window
-    max:      20,              // max 20 requests per window per IP
-    message:  {
-        errors: [{ message: 'Too many attempts from this IP. Please wait 15 minutes.' }]
-    },
-    standardHeaders: true,
-    legacyHeaders:   false
-});
-
-// ── 5. Static File Serving ────────────────────────────────────────────────────
+// ── 4. Static File Serving ────────────────────────────────────────────────────
 // Serve CSS, frontend JS, and images as static files.
 // HTML pages are served through routes (not static), so we control access.
 app.use('/css',    express.static(path.join(__dirname, '../css')));
 app.use('/js',     express.static(path.join(__dirname, '../js')));
 app.use('/assets', express.static(path.join(__dirname, '../frontend/assets')));
 
-// ── 6. Page Routes ────────────────────────────────────────────────────────────
+// ── 5. Page Routes ────────────────────────────────────────────────────────────
 
 // Home — redirect to dashboard if logged in, otherwise to login
 app.get('/', (req, res) => {
@@ -126,9 +112,9 @@ app.get('/dashboard', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
 });
 
-// ── 7. API Routes ─────────────────────────────────────────────────────────────
-// All auth API endpoints — rate limited
-app.use('/api/auth', authLimiter, authRoutes);
+// ── 6. API Routes ─────────────────────────────────────────────────────────────
+// Authentication API endpoints (/signup and /login are rate-limited in authRoutes.js)
+app.use('/api/auth', authRoutes);
 
 // ── 8. 404 Handler ────────────────────────────────────────────────────────────
 app.use((req, res) => {
