@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
-    "test": "node backend/test_suite.js"
+    "test": "node backend/test_suite.js",
+    "test:adapters": "node backend/test_database_adapters.js"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -18,6 +19,7 @@
     "express-rate-limit": "^7.2.0",
     "express-session": "^1.18.0",
     "express-validator": "^7.0.1",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "pg": "^8.16.3"
   }
 }

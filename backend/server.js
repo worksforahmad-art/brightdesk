@@ -30,8 +30,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Essential for secure cookies over HTTPS and correct client IP rate limiting
 app.set('trust proxy', 1);
 
-if (isProduction && !process.env.SESSION_SECRET) {
-    console.warn('⚠️  WARNING: SESSION_SECRET is not set in environment variables! Please configure it in Railway.');
+if (isProduction && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
+    throw new Error('Production requires a strong SESSION_SECRET (at least 32 characters).');
 }
 
 // ── 1. Security Headers (helmet) ──────────────────────────────────────────────
@@ -59,12 +59,12 @@ app.use(express.urlencoded({ extended: false }));
 
 // ── 3. Session Setup ──────────────────────────────────────────────────────────
 // Sessions keep users logged in between requests.
-// We store sessions in SQLite so they survive server restarts.
-const SQLiteStore = createSessionStore(session);
+// Sessions are stored in SQLite locally or PostgreSQL when DATABASE_URL is set.
+const DatabaseSessionStore = createSessionStore(session);
 
 app.use(
     session({
-        store:             new SQLiteStore(db), // save sessions in SQLite
+        store:             new DatabaseSessionStore(db), // persistent database sessions
         name:              'brightdesk.sid',    // name of the cookie in the browser
         secret:            process.env.SESSION_SECRET || 'dev-fallback-secret-change-me',
         resave:            false,
@@ -136,10 +136,28 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 // ── 10. Start Server ──────────────────────────────────────────────────────────
-app.listen(PORT, HOST, () => {
-    console.log('');
-    console.log('  ✨  BrightDesk is running!');
-    console.log(`  🌐  Listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-    console.log('  ⏹   Press Ctrl + C to stop.');
-    console.log('');
+async function startServer() {
+    if (process.env.DATABASE_URL) {
+        // Fail safely on missing schema/invalid credentials. Never switch back
+        // to an ephemeral SQLite database when PostgreSQL is misconfigured.
+        await db.query('SELECT 1 FROM public.users LIMIT 0');
+        await db.query('SELECT 1 FROM public.sessions LIMIT 0');
+        console.log('  Database ready: PostgreSQL (Supabase)');
+    }
+
+    app.listen(PORT, HOST, () => {
+        console.log('');
+        console.log('  BrightDesk is running!');
+        console.log(`  Listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+        console.log('  Press Ctrl + C to stop.');
+        console.log('');
+    });
+}
+
+startServer().catch(err => {
+    console.error('Database startup check failed:', err.message);
+    process.exitCode = 1;
+    if (typeof db.end === 'function') {
+        db.end().catch(() => {});
+    }
 });

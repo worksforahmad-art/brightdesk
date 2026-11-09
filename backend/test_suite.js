@@ -7,12 +7,14 @@
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
-// Ensure database file directory exists
-const dbPath = path.join(__dirname, 'database', 'brightdesk.db');
-if (fs.existsSync(dbPath)) {
-    // We can keep it or clean test records
-}
+// Tests must NEVER read or modify local accounts or the live Supabase database.
+// Give every run its own disposable SQLite file before loading the app modules.
+const testDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'brightdesk-test-'));
+delete process.env.DATABASE_URL;
+process.env.DATABASE_PATH = path.join(testDirectory, 'test.db');
+process.env.NODE_ENV = 'test';
 
 const express = require('express');
 const session = require('express-session');
@@ -351,11 +353,9 @@ async function runTests() {
     console.log(`Failed:      ${failed}`);
     console.log(`================================\n`);
 
-    if (failed > 0) {
-        process.exit(1);
-    } else {
-        process.exit(0);
-    }
+    try { db.close(); } catch (_) { /* already closed */ }
+    fs.rmSync(testDirectory, { recursive: true, force: true });
+    process.exitCode = failed > 0 ? 1 : 0;
 }
 
 runTests();

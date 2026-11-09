@@ -42,14 +42,14 @@ const authController = {
 
         try {
             // Check for duplicate email
-            if (userModel.findByEmail(email)) {
+            if (await userModel.findByEmail(email)) {
                 return res.status(409).json({
                     errors: [{ field: 'email', message: 'An account with this email already exists.' }]
                 });
             }
 
             // Check for duplicate username
-            if (userModel.findByUsername(username)) {
+            if (await userModel.findByUsername(username)) {
                 return res.status(409).json({
                     errors: [{ field: 'username', message: 'This username is already taken.' }]
                 });
@@ -62,7 +62,7 @@ const authController = {
             const hashedPassword = await bcrypt.hash(password, 12);
 
             // Save the user (password is now a hash, never plain text)
-            userModel.create({ fullName, username, email, hashedPassword });
+            await userModel.create({ fullName, username, email, hashedPassword });
 
             return res.status(201).json({
                 success: true,
@@ -70,6 +70,21 @@ const authController = {
             });
 
         } catch (err) {
+            // Unique constraints also protect against concurrent duplicate signups.
+            if (err.code === '23505' || err.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+                /UNIQUE constraint failed/i.test(err.message || '')) {
+                const detail = `${err.constraint || ''} ${err.message || ''}`.toLowerCase();
+                const field = detail.includes('email') ? 'email' :
+                    detail.includes('username') ? 'username' : null;
+                return res.status(409).json({
+                    errors: [{
+                        ...(field && { field }),
+                        message: field === 'email' ? 'An account with this email already exists.' :
+                            field === 'username' ? 'This username is already taken.' :
+                            'An account with these details already exists.'
+                    }]
+                });
+            }
             console.error('Signup error:', err);
             return res.status(500).json({
                 errors: [{ message: 'Something went wrong. Please try again.' }]
@@ -101,7 +116,7 @@ const authController = {
 
         try {
             // Look up the user by email
-            const user = userModel.findByEmail(email);
+            const user = await userModel.findByEmail(email);
 
             // SECURITY NOTE — Constant-time comparison:
             // Even if the user doesn't exist, we still run bcrypt.compare().
@@ -186,30 +201,34 @@ const authController = {
      * Called by the Dashboard page on load to display user info.
      * Protected by requireAuthApi — only works if the session is valid.
      */
-    getMe(req, res) {
+    async getMe(req, res) {
         if (!req.session || !req.session.userId) {
             return res.status(401).json({ error: 'Not authenticated. Please log in.' });
         }
 
-        const user = userModel.findById(Number(req.session.userId));
-
-        if (!user) {
-            // Session references a user that no longer exists
-            req.session.destroy(() => {});
-            res.clearCookie('brightdesk.sid');
-            return res.status(401).json({ error: 'Session invalid. Please log in again.' });
-        }
-
-        return res.status(200).json({
-            user: {
-                id: user.id,
-                fullName: user.full_name,
-                username: user.username,
-                email: user.email,
-                createdAt: user.created_at,
-                status: 'Active'
+        try {
+            const user = await userModel.findById(Number(req.session.userId));
+            if (!user) {
+                // Session references an account that no longer exists.
+                req.session.destroy(() => {});
+                res.clearCookie('brightdesk.sid');
+                return res.status(401).json({ error: 'Session invalid. Please log in again.' });
             }
-        });
+
+            return res.status(200).json({
+                user: {
+                    id: user.id,
+                    fullName: user.full_name,
+                    username: user.username,
+                    email: user.email,
+                    createdAt: user.created_at,
+                    status: 'Active'
+                }
+            });
+        } catch (err) {
+            console.error('Dashboard account lookup failed:', err.message);
+            return res.status(503).json({ error: 'Unable to load your account. Please try again.' });
+        }
     }
 };
 

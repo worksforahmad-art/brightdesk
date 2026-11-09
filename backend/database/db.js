@@ -1,59 +1,76 @@
 /**
- * db.js — Database Connection
+ * BrightDesk database selection.
  *
- * Opens (or creates) the SQLite database file and sets up all tables.
- * Uses Node.js's built-in node:sqlite (DatabaseSync) which is natively supported
- * in Node.js 22+ without requiring native C++ compilers (like node-gyp or Visual Studio).
- *
- * Configurable via DATABASE_PATH environment variable for production deployments
- * (e.g. Railway persistent volume mounted at /data/brightdesk.db).
- * Defaults to backend/database/brightdesk.db for local development.
- *
- * Tables created here:
- *   - users    : stores registered accounts
- *   - sessions : stores login sessions (used by our custom session store)
+ * When DATABASE_URL is configured, queries use Supabase PostgreSQL via `pg`.
+ * Otherwise, local development continues to use the existing SQLite database.
+ * The PostgreSQL schema is managed by the versioned SQL migration, not by
+ * starting the application (so deployment cannot silently change the schema).
  */
+const path = require('node:path');
+const fs = require('node:fs');
 
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
-const fs = require('fs');
+if (process.env.DATABASE_URL) {
+    const { Pool } = require('pg');
+    const connectionUrl = new URL(process.env.DATABASE_URL);
+    if (!['postgres:', 'postgresql:'].includes(connectionUrl.protocol)) {
+        throw new Error('DATABASE_URL must be a PostgreSQL connection string.');
+    }
 
-// Support custom database path via DATABASE_PATH (e.g., /data/brightdesk.db on Railway)
-const DB_PATH = process.env.DATABASE_PATH
-    ? path.resolve(process.env.DATABASE_PATH)
-    : path.join(__dirname, 'brightdesk.db');
+    // node-postgres lets sslmode in the URL override the `ssl` object. Remove
+    // conflicting URL parameters so certificate verification cannot be bypassed.
+    for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) {
+        connectionUrl.searchParams.delete(key);
+    }
 
-// Ensure the parent directory exists before creating or opening the database
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+    const sslEnabled = process.env.DATABASE_SSL !== 'false';
+    if (process.env.NODE_ENV === 'production' && !sslEnabled) {
+        throw new Error('DATABASE_SSL cannot be false in production.');
+    }
+
+    const ssl = sslEnabled ? { rejectUnauthorized: true } : false;
+    if (sslEnabled && process.env.DATABASE_CA_CERT) {
+        // Accept a PEM certificate copied into a Railway variable, with either
+        // literal newlines or escaped \n sequences.
+        ssl.ca = process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n');
+    }
+
+    const pool = new Pool({
+        connectionString: connectionUrl.toString(),
+        ssl,
+        max: 5,
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000
+    });
+
+    pool.on('error', err => {
+        console.error('Unexpected PostgreSQL pool error:', err.message);
+    });
+
+    module.exports = pool;
+} else {
+    const { DatabaseSync } = require('node:sqlite');
+    const databasePath = process.env.DATABASE_PATH
+        ? path.resolve(process.env.DATABASE_PATH)
+        : path.join(__dirname, 'brightdesk.db');
+
+    fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+    const db = new DatabaseSync(databasePath);
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            username TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+            sid TEXT PRIMARY KEY,
+            sess TEXT NOT NULL,
+            expired_at INTEGER NOT NULL
+        );
+    `);
+    console.log('  Database ready (SQLite):', databasePath);
+    module.exports = db;
 }
-
-// Open the database (creates the file if it doesn't exist yet)
-const db = new DatabaseSync(DB_PATH);
-
-// WAL mode makes reads and writes faster and concurrent
-db.exec('PRAGMA journal_mode = WAL;');
-
-// Create tables if they don't exist yet
-// Using IF NOT EXISTS means this is safe to run every time the server starts
-db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        full_name   TEXT    NOT NULL,
-        username    TEXT    NOT NULL UNIQUE,
-        email       TEXT    NOT NULL UNIQUE,
-        password    TEXT    NOT NULL,
-        created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-        sid         TEXT    PRIMARY KEY,
-        sess        TEXT    NOT NULL,
-        expired_at  INTEGER NOT NULL
-    );
-`);
-
-console.log('  📦 Database ready:', DB_PATH);
-
-module.exports = db;

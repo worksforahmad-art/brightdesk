@@ -1,85 +1,102 @@
 /**
- * sessionStore.js — Custom SQLite Session Store
- *
- * express-session needs somewhere to save session data between requests.
- * By default it uses memory (RAM), which gets wiped every server restart.
- *
- * This store saves sessions in the SQLite database instead, so logins
- * survive server restarts.
- *
- * How it works:
- *   - When you log in, express-session calls store.set() to save your session.
- *   - On the next request, it calls store.get() to load your session.
- *   - On logout, it calls store.destroy() to delete your session.
+ * express-session store backed by PostgreSQL when DATABASE_URL is configured,
+ * or by local SQLite otherwise. Both preserve sessions across server restarts.
+ * `touch` refreshes the stored expiry as users navigate the application.
  */
-
 function createSessionStore(session) {
-    class SQLiteStore extends session.Store {
-        /**
-         * @param {import('better-sqlite3').Database} db - the shared database connection
-         */
+    class DatabaseSessionStore extends session.Store {
         constructor(db) {
             super();
             this.db = db;
+            this.isPostgres = Boolean(process.env.DATABASE_URL);
 
-            // Every 15 minutes, delete any sessions that have expired
-            const cleanupTimer = setInterval(() => this._removeExpired(), 15 * 60 * 1000);
-            // .unref() lets Node.js exit even if this timer is still ticking
-            if (cleanupTimer.unref) cleanupTimer.unref();
+            const timer = setInterval(() => this._removeExpired(), 15 * 60 * 1000);
+            if (timer.unref) timer.unref();
         }
 
-        /** Load a session by its ID */
+        _expiration(sessionData) {
+            const date = sessionData.cookie && sessionData.cookie.expires;
+            return date ? new Date(date).getTime() : Date.now() + 24 * 60 * 60 * 1000;
+        }
+
         get(sid, callback) {
+            if (this.isPostgres) {
+                this.db.query(
+                    'SELECT sess FROM public.sessions WHERE sid = $1 AND expired_at > $2',
+                    [sid, Date.now()]
+                ).then(({ rows }) => callback(null, rows[0] ? JSON.parse(rows[0].sess) : null))
+                 .catch(err => callback(err));
+                return;
+            }
+
             try {
-                const row = this.db
-                    .prepare('SELECT sess FROM sessions WHERE sid = ? AND expired_at > ?')
+                const row = this.db.prepare('SELECT sess FROM sessions WHERE sid = ? AND expired_at > ?')
                     .get(sid, Date.now());
-                // JSON.parse converts the stored string back into a JavaScript object
                 callback(null, row ? JSON.parse(row.sess) : null);
-            } catch (err) {
-                callback(err);
-            }
+            } catch (err) { callback(err); }
         }
 
-        /** Save or update a session */
-        set(sid, sessionData, callback) {
-            // Calculate when this session should expire
-            const expires = sessionData.cookie && sessionData.cookie.expires
-                ? new Date(sessionData.cookie.expires).getTime()
-                : Date.now() + 24 * 60 * 60 * 1000; // default: 24 hours
+        set(sid, sessionData, callback = () => {}) {
+            const expiry = this._expiration(sessionData);
+            const json = JSON.stringify(sessionData);
+
+            if (this.isPostgres) {
+                this.db.query(`
+                    INSERT INTO public.sessions (sid, sess, expired_at)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (sid) DO UPDATE
+                    SET sess = EXCLUDED.sess, expired_at = EXCLUDED.expired_at
+                `, [sid, json, expiry])
+                    .then(() => callback(null)).catch(callback);
+                return;
+            }
 
             try {
-                this.db
-                    .prepare('INSERT OR REPLACE INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
-                    // JSON.stringify converts the session object to a string for storage
-                    .run(sid, JSON.stringify(sessionData), expires);
+                this.db.prepare('INSERT OR REPLACE INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
+                    .run(sid, json, expiry);
                 callback(null);
-            } catch (err) {
-                callback(err);
-            }
+            } catch (err) { callback(err); }
         }
 
-        /** Delete a session (called on logout) */
-        destroy(sid, callback) {
+        touch(sid, sessionData, callback = () => {}) {
+            const expiry = this._expiration(sessionData);
+            if (this.isPostgres) {
+                this.db.query('UPDATE public.sessions SET expired_at = $2 WHERE sid = $1', [sid, expiry])
+                    .then(() => callback(null)).catch(callback);
+                return;
+            }
+            try {
+                this.db.prepare('UPDATE sessions SET expired_at = ? WHERE sid = ?').run(expiry, sid);
+                callback(null);
+            } catch (err) { callback(err); }
+        }
+
+        destroy(sid, callback = () => {}) {
+            if (this.isPostgres) {
+                this.db.query('DELETE FROM public.sessions WHERE sid = $1', [sid])
+                    .then(() => callback(null)).catch(callback);
+                return;
+            }
             try {
                 this.db.prepare('DELETE FROM sessions WHERE sid = ?').run(sid);
                 callback(null);
-            } catch (err) {
-                callback(err);
-            }
+            } catch (err) { callback(err); }
         }
 
-        /** Remove expired sessions from the database */
         _removeExpired() {
+            if (this.isPostgres) {
+                this.db.query('DELETE FROM public.sessions WHERE expired_at <= $1', [Date.now()])
+                    .catch(err => console.error('Session cleanup failed:', err.message));
+                return;
+            }
             try {
                 this.db.prepare('DELETE FROM sessions WHERE expired_at <= ?').run(Date.now());
-            } catch (_) {
-                // Silently ignore cleanup errors — they're not critical
+            } catch (err) {
+                console.error('Session cleanup failed:', err.message);
             }
         }
     }
-
-    return SQLiteStore;
+    return DatabaseSessionStore;
 }
 
 module.exports = createSessionStore;

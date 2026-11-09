@@ -19,3 +19,10 @@ backend/database/*.db-wal
 Thumbs.db
 .vscode/settings.json
 *.log
+
+# Extra local database and development backups
+*.sqlite
+*.sqlite3
+*.db-journal
+*.backup
+brightdesk-backup*/
